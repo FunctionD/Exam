@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:aop="http://www.springframework.org/schema/aop"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xmlns:tx="http://www.springframework.org/schema/tx"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+                           http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd
+                           http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx.xsd
+                           http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop.xsd">
+
+    <!--<context:annotation-config/>-->
+
+    <context:component-scan base-package="com.lanqiao.exam.service"/>
+
+    <!-- 可以本配置文件中引用属性文件中的值
+       <bean class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
+           <property name="locations" value="classpath:jdbc.properties"/>
+       </bean>
+   -->
+    <context:property-placeholder location="classpath:database.properties"/>
+
+    <!-- 声明一个alibaba druid数据源 -->
+    <bean id="dataSource" class="com.alibaba.druid.pool.DruidDataSource" init-method="init" destroy-method="close">
+        <!-- 基本属性 url、user、password -->
+        <property name="url" value="${jdbc.url}"/>
+        <property name="username" value="${jdbc.username}"/>
+        <property name="password" value="${jdbc.password}"/>
+        <!-- <property name="driverClassName" value="${jdbc.driver}"></property> -->
+        <!-- 配置初始化大小、最小、最大 -->
+        <property name="initialSize" value="1"/>
+        <property name="minIdle" value="1"/>
+        <property name="maxActive" value="20"/>
+        <!-- 配置获取连接等待超时的时间 -->
+        <property name="maxWait" value="60000"/>
+        <!-- 配置间隔多久才进行一次检测，检测需要关闭的空闲连接，单位是毫秒 -->
+        <property name="timeBetweenEvictionRunsMillis" value="60000"/>
+        <!-- 配置一个连接在池中最小生存的时间，单位是毫秒 -->
+        <property name="minEvictableIdleTimeMillis" value="300000"/>
+        <property name="validationQuery" value="SELECT 'x' FROM DUAL"/>
+        <property name="testWhileIdle" value="true"/>
+        <property name="testOnBorrow" value="false"/>
+        <property name="testOnReturn" value="false"/>
+        <!-- 打开PSCache，并且指定每个连接上PSCache的大小 -->
+        <property name="poolPreparedStatements" value="true"/>
+        <property name="maxPoolPreparedStatementPerConnectionSize" value="20"/>
+        <!-- 配置监控统计拦截的filters -->
+        <property name="filters" value="stat,log4j"/>
+    </bean>
+
+    <!-- 声明mybatis SqlSessionFactory -->
+    <bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+        <property name="dataSource" ref="dataSource"/>
+        <!-- myBatis配置文件 -->
+        <!--<property name="configLocation" value="classpath:mybatis-config.xml"/>-->
+        <!--
+            可以在Configuration.xml或此处配置映射文件，但其中不能有相同id的parameterMap, resultMap或sql等
+        <property name="mapperLocations" value="classpath*:com/lanqiao/mapper/*.xml" />
+		 -->
+        <property name="typeAliasesPackage" value="com.lanqiao.exam.vo"/>
+    </bean>
+
+    <!-- Scan Mapper Files 配置MyBatis映射接口扫描器,扫描映射接口后会自动给你创建出spring Bean -->
+    <bean class="org.mybatis.spring.mapper.MapperScannerConfigurer">
+        <property name="basePackage" value="com.lanqiao.exam.mapper"/>
+        <property name="sqlSessionFactoryBeanName" value="sqlSessionFactory"/>
+    </bean>
+
+    <!--================事务相关控制===================-->
+    <bean name="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+        <property name="dataSource" ref="dataSource"/>
+    </bean>
+
+    <!-- AOP声明式事务 -->
+    <tx:advice id="txAdvice" transaction-manager="transactionManager">
+        <!-- 声明数据库事务切入的连接点-->
+        <tx:attributes>
+            <!-- propagation="REQUIRED" 表示这样的操作必须在事务上下文内执行
+                 read-only="false" 表示此事务不是一个只读事务，即可对数据库做写操作，若是只读事务则在事务上下文内只能读即查询
+                 rollback-for="java.lang.Exception" 表示当出现此类异常时事务会自动回滚
+            -->
+            <tx:method name="insert*" propagation="REQUIRED" read-only="false" rollback-for="java.lang.Exception"/>
+            <tx:method name="save*" propagation="REQUIRED" read-only="false" rollback-for="java.lang.Exception"/>
+            <tx:method name="delete*" propagation="REQUIRED" read-only="false" rollback-for="java.lang.Exception"/>
+            <tx:method name="remove*" propagation="REQUIRED" read-only="false" rollback-for="java.lang.Exception"/>
+            <tx:method name="update*" propagation="REQUIRED" read-only="false" rollback-for="java.lang.Exception"/>
+            <tx:method name="find*" propagation="SUPPORTS" read-only="true"/>
+            <tx:method name="get*" propagation="SUPPORTS" read-only="true"/>
+            <tx:method name="select*" propagation="SUPPORTS" read-only="true"/>
+        </tx:attributes>
+    </tx:advice>
+
+    <aop:config>
+        <!--把事务控制在Service层
+            Service.trans(){
+                mapper update_account1();
+                mapper update_account2();
+
+            }
+        -->
+        <aop:pointcut id="txPointcut" expression="execution(public * com.lanqiao.exam.service..*.*(..))"/>
+        <aop:advisor pointcut-ref="txPointcut" advice-ref="txAdvice"/>
+    </aop:config>
+
+</beans>
